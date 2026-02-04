@@ -1,20 +1,35 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using CTM.Data;
+using CTM.Models;
+using CTM.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlite(connectionString));
+    options.UseNpgsql(connectionString));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
     .AddEntityFrameworkStores<ApplicationDbContext>();
 builder.Services.AddControllersWithViews();
 
+// Register HttpClient for SchoolDataService
+builder.Services.AddHttpClient<SchoolDataService>();
+// Register the SchoolDataService as a scoped service
+builder.Services.AddScoped<SchoolDataService>();
+
 var app = builder.Build();
+
+// Seed school data from EDB if in Development environment
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var schoolService = scope.ServiceProvider.GetRequiredService<SchoolDataService>();
+    await schoolService.FetchAndSeedSchoolsAsync();
+}
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
